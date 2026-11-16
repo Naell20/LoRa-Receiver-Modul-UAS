@@ -20,6 +20,9 @@ const int csPin = 5;
 const int resetPin = 14;
 const int DIO0 = 34;
 
+unsigned long lastSendTime = 0;
+const unsigned long batasTimeout = 5000;
+
 RTC_DS3231 rtc;
 
 const char* namaBulan[] = {
@@ -56,7 +59,7 @@ void setup() {
     }
   }
 
-  LoRa.setSyncWord(0x34);
+  LoRa.setSyncWord(0x3F);
   Serial.println("LoRa Receiver Ready");
 }
 
@@ -65,6 +68,9 @@ void loop() {
 
   int packetSize = LoRa.parsePacket();
   if (packetSize) {
+
+    lastSendTime = millis(); //rst timer recov
+
     String incomingData = "";
     while (LoRa.available()) {
       incomingData += (char)LoRa.read();
@@ -115,6 +121,20 @@ void loop() {
       Serial.println(incomingData);
     } else {
       Serial.println("Peringatan: Format data tidak valid!");
+    }
+  }
+  else {
+    if (millis() - lastSendTime > batasTimeout) {
+      Serial.println("Sinyal Lora Tidak Terhubung Recovery Mode ON");
+
+      if(LoRa.begin(433E6)) {
+        LoRa.setSyncWord(0x3F);
+        Serial.println("LoRa Receiver Reconnected");
+      } else {
+        Serial.println ("LoRa Receiver Reconnection Failed Reset Hardware");
+      }
+
+      lastSendTime = millis();
     }
   }
 }
