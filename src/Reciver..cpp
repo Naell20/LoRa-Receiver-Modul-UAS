@@ -11,8 +11,8 @@
 #define BLYNK_PRINT Serial
 
 char auth[] = "nANAFvvACP0bm9-CALdfZBF0RzR1xr95";
-char ssid[] = "StarLink 5G";
-char pass[] = "20012008";
+char ssid[] = "pudding coklat";
+char pass[] = "12233445";
 
 #include <BlynkSimpleEsp32.h>
 
@@ -22,6 +22,9 @@ const int DIO0 = 34;
 
 unsigned long lastSendTime = 0;
 const unsigned long batasTimeout = 5000;
+const unsigned long intervalRecovery = 1000;
+unsigned long lastRecoveryAttempt = 0;
+bool loraReady = false;
 
 RTC_DS3231 rtc;
 
@@ -29,6 +32,36 @@ const char* namaBulan[] = {
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 };
+
+bool initializeLoRa() {
+  LoRa.setPins(csPin, resetPin, DIO0);
+  if (!LoRa.begin(433E6)) {
+    return false;
+  }
+
+  LoRa.setSyncWord(0x34);
+  return true;
+}
+
+bool recoverLoRa() {
+  LoRa.end();
+  delay(10);
+  return initializeLoRa();
+}
+
+bool sendAck() {
+  if (!LoRa.beginPacket()) {
+    return false;
+  }
+
+  LoRa.print("ACK");
+  if (!LoRa.endPacket()) {
+    return false;
+  }
+
+  LoRa.receive();
+  return true;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -51,20 +84,35 @@ void setup() {
     }
   }
 
-  LoRa.setPins(csPin, resetPin, DIO0);
-  if (!LoRa.begin(433E6)) {
-    Serial.println("LoRa Gagal Terhubung");
-    while (1) {
-      ;
-    }
+  while (!initializeLoRa()) {
+    Serial.println("LoRa gagal diinisialisasi, mencoba kembali dalam 1 detik...");
+    delay(intervalRecovery);
   }
 
-  LoRa.setSyncWord(0x3F);
+  loraReady = true;
+  lastSendTime = millis();
   Serial.println("LoRa Receiver Ready");
 }
 
 void loop() {
   Blynk.run();
+
+  //updet
+  if (!loraReady) {
+    if (millis() - lastRecoveryAttempt >= intervalRecovery) {
+      lastRecoveryAttempt = millis();
+      Serial.println("Mencoba menginisialisasi ulang LoRa...");
+      loraReady = recoverLoRa();
+
+      if (loraReady) {
+        lastSendTime = millis();
+        Serial.println("LoRa berhasil diinisialisasi ulang");
+      } else {
+        Serial.println("Inisialisasi LoRa gagal, mencoba kembali");
+      }
+    }
+    return;
+  }
 
   int packetSize = LoRa.parsePacket();
   if (packetSize) {
@@ -91,6 +139,16 @@ void loop() {
     }
 
     if (koma1 != -1 && koma2 != -1 && koma3 != -1) {
+      if (!sendAck()) {
+        Serial.println("Gagal mengirim Data, memulai recovery LoRa...");
+        loraReady = recoverLoRa();
+        if (!loraReady) {
+          Serial.println("Recovery LoRa gagal, akan mencoba kembali");
+          return;
+        }
+        Serial.println("Recovery LoRa berhasil");
+      }
+
       float vGen = incomingData.substring(0, koma1).toFloat();
       float iGen = incomingData.substring(koma1 + 1, koma2).toFloat();
       float vOut = incomingData.substring(koma2 + 1, koma3).toFloat();
@@ -124,17 +182,17 @@ void loop() {
     }
   }
   else {
-    if (millis() - lastSendTime > batasTimeout) {
-      Serial.println("Sinyal Lora Tidak Terhubung Recovery Mode ON");
-
-      if(LoRa.begin(433E6)) {
-        LoRa.setSyncWord(0x3F);
-        Serial.println("LoRa Receiver Reconnected");
+    if (millis() - lastSendTime >= batasTimeout &&
+        millis() - lastRecoveryAttempt >= intervalRecovery) {
+      Serial.println("Tidak ada paket masuk, memulai recovery...");
+      lastRecoveryAttempt = millis();
+      loraReady = recoverLoRa();
+      if (loraReady) {
+        lastSendTime = millis();
+        Serial.println("LoRa Terhubung; menunggu paket");
       } else {
-        Serial.println ("LoRa Receiver Reconnection Failed Reset Hardware");
+        Serial.println("Recovery LoRa gagal, mencoba kembali");
       }
-
-      lastSendTime = millis();
     }
   }
 }
