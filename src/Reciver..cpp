@@ -32,7 +32,7 @@ const char* namaBulan[] = {
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 };
-
+// Recov  if 433 gk nemu 
 bool initializeLoRa() {
   LoRa.setPins(csPin, resetPin, DIO0);
   if (!LoRa.begin(433E6)) {
@@ -66,7 +66,7 @@ bool sendAck() {
 void setup() {
   Serial.begin(115200);
   while (!Serial) {
-    ;
+    return;
   }
   delay(1000);
 
