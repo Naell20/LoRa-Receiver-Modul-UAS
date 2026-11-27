@@ -251,16 +251,16 @@ void loop() {
 
     Serial.print("[Waktu] ");
     Serial.println(timestamp);
-    Serial.print("  V_Generator: ");
+    Serial.print("  V_BAT: ");
     Serial.print(vGen);
-    Serial.println(" V");
-    Serial.print("  I_Generator: ");
+    Serial.println(" V DC");
+    Serial.print("  I_BAT: ");
     Serial.print(iGen);
-    Serial.println(" A");
-    Serial.print("  V_Output: ");
+    Serial.println(" A DC");
+    Serial.print("  V_AC: ");
     Serial.print(vOut);
     Serial.println(" V");
-    Serial.print("  I_Output: ");
+    Serial.print("  I_AC: ");
     Serial.print(iOut);
     Serial.println(" A");
 
